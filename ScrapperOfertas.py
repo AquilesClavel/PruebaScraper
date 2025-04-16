@@ -3,6 +3,7 @@ import requests
 from bs4 import BeautifulSoup
 import pandas as pd
 import time
+import os
 class ScraperOfertas:
     def __init__(self,busqueda_="",n_paginas_ = 1):
         self.busqueda  = busqueda_
@@ -50,16 +51,10 @@ class ScraperOfertas:
                         "Enlace":     link,
                         "Imagen":     image_url
                     })
+
         if self.n_paginas > 1:
             time.sleep(3)# Espera entre páginas para no saturar el sitio
-
-    def mostrar_resultados_mercadoLibre_html(self,orden=1):
-        self.ofertas = sorted(self.ofertas,
-                 key = lambda x:( 
-                     x["Tag"]=="",
-                     x["Precio_int"]*orden)
-                )
-        # Crear HTML
+    def crear_html_ML(self,ofertas,cont_html,items_pag,cont_items) -> int: 
         html = '''
         <!DOCTYPE html>
         <html lang="es">
@@ -135,19 +130,25 @@ class ScraperOfertas:
             <h1>Ofertas de '''+self.busqueda+''' en MercadoLibre</h1>
             <div class="grid">
         '''
-
-        for oferta in self.ofertas:
+        cont_tmp = 1
+        for i in range(cont_items,len(ofertas)):
+            if cont_tmp%items_pag == 0:
+                cont_tmp = 1
+                break
             html += f'''
                 <div class="card">
-                    <h4>{oferta["Tag"]}</h4>
-                    <img src="{oferta["Imagen"]}" alt="Imagen del producto">
+                    <h4>{ofertas[i]["Tag"]}</h4>
+                    <img src="{ofertas[i]["Imagen"]}" alt="Imagen del producto">
                     <div class="info">
-                        <h3>{oferta["Titulo"]}</h3>
-                        <p>{oferta["Precio"]}</p>
-                        <a href="{oferta["Enlace"]}" target="_blank">Ver en MercadoLibre</a>
+                        <h3>{ofertas[i]["Titulo"]}</h3>
+                        <p>{ofertas[i]["Precio"]}</p>
+                        <a href="{ofertas[i]["Enlace"]}" target="_blank">Ver en MercadoLibre</a>
                     </div>
                 </div>
             '''
+            print(f"Cont tmp: {cont_tmp}")
+            cont_items+=1
+            cont_tmp+=1
 
         html += '''
             </div>
@@ -155,8 +156,28 @@ class ScraperOfertas:
         </html>
         '''
         nombre_archivo = self.busqueda.replace(" ","_")
-        with open(f"PaginasHTML/ofertas_{nombre_archivo}.html", "w", encoding="utf-8") as file:
+        os.makedirs(f"PaginasHTML/{nombre_archivo}",exist_ok=True)
+        with open(f"PaginasHTML/{nombre_archivo}/ofertas_{nombre_archivo}_{cont_html}.html", "w", encoding="utf-8") as file:
             file.write(html)
+
+        return cont_items
+
+
+    def mostrar_resultados_mercadoLibre_html(self,orden=1):
+        self.ofertas = sorted(self.ofertas,
+                 key = lambda x:( 
+                     x["Tag"]=="",
+                     x["Precio_int"]*orden)
+                )
+        tamanio = len(self.ofertas)
+        items_por_pagina=24
+        cont_items = 0
+        cont_html = 0
+        while cont_items<len(self.ofertas)-1:
+            cont_items=self.crear_html_ML(self.ofertas,cont_html,items_por_pagina,cont_items)
+            cont_html+=1
+        # Crear HTML
+       
 
 def main():
     scraper = ScraperOfertas("Samsung S24",2)
