@@ -131,6 +131,7 @@ class ScraperOfertas:
             <div class="grid">
         '''
         cont_tmp = 1
+        items_pag+=1 #items_pag es un limite superior exclusivo, se le añade 1 para que funcione adecuadamente
         for i in range(cont_items,len(ofertas)):
             if cont_tmp%items_pag == 0:
                 cont_tmp = 1
