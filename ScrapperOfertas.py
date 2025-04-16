@@ -7,7 +7,7 @@ class ScraperOfertas:
     def __init__(self,busqueda_="",n_paginas_ = 1):
         self.busqueda  = busqueda_
         self.n_paginas = n_paginas_
-        self.ofertas = {}
+        self.ofertas = []
         self.headers   = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
         }
@@ -32,8 +32,6 @@ class ScraperOfertas:
                 image_tag = item.find("img", class_="poly-component__picture")
                 highlight_tag =item.find("span",class_="poly-component__highlight")
                 condition_tag =item.find("span",class_="poly-component__item-condition")
-                print(highlight_tag)
-
                 if title_tag and price_tag and link_tag and image_tag and not condition_tag:
                     if highlight_tag:
                         highlight = highlight_tag.get_text(strip=True)
@@ -53,13 +51,13 @@ class ScraperOfertas:
                         "Imagen":     image_url
                     })
         if self.n_paginas > 1:
-            time.sleep(3)# 💤 Espera entre páginas para no saturar el sitio
+            time.sleep(3)# Espera entre páginas para no saturar el sitio
 
     def mostrar_resultados_mercadoLibre_html(self,orden=1):
-        ofertas = sorted(ofertas,
+        self.ofertas = sorted(self.ofertas,
                  key = lambda x:( 
                      x["Tag"]=="",
-                     x["Precio_int"]*self.orden)
+                     x["Precio_int"]*orden)
                 )
         # Crear HTML
         html = '''
@@ -156,8 +154,12 @@ class ScraperOfertas:
         </body>
         </html>
         '''
+        nombre_archivo = self.busqueda.replace(" ","_")
+        with open(f"PaginasHTML/ofertas_{nombre_archivo}.html", "w", encoding="utf-8") as file:
+            file.write(html)
 
 def main():
-    scraper = ScraperOfertas("Samsung S24")
-
+    scraper = ScraperOfertas("Samsung S24",2)
+    scraper.buscar_mercadoLibre()
+    scraper.mostrar_resultados_mercadoLibre_html()
 main()
