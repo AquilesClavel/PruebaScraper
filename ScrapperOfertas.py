@@ -4,6 +4,7 @@ from bs4 import BeautifulSoup
 import pandas as pd
 import time
 import os
+from math import ceil
 class ScraperOfertas:
     def __init__(self,busqueda_="",n_paginas_ = 1):
         self.busqueda  = busqueda_
@@ -54,114 +55,152 @@ class ScraperOfertas:
 
         if self.n_paginas > 1:
             time.sleep(3)# Espera entre páginas para no saturar el sitio
-    def crear_html_ML(self,ofertas,cont_html,items_pag,cont_items) -> int: 
-        html = '''
-        <!DOCTYPE html>
-        <html lang="es">
-        <head>
-            <meta charset="UTF-8">
-            <title>Ofertas de '''+self.busqueda+''' en MercadoLibre</title>
-            <style>
-                body {
-                    font-family: Arial, sans-serif;
-                    background: #f2f2f2;
-                    padding: 20px;
-                }
-                h1 {
-                    text-align: center;
-                    color: #333;
-                }
-                .grid {
-                    display: grid;
-                    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-                    gap: 20px;
-                    margin-top: 30px;
-                }
-                .card {
-                    background: white;
-                    border-radius: 10px;
-                    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-                    overflow: hidden;
-                    transition: transform 0.2s ease;
-                }
-                .card:hover {
-                    transform: scale(1.03);
-                }
-                .card img {
-                    width: 100%;
-                    height: 200px;
-                    object-fit: contain;
-                    background: #fafafa;
-                }
-                .card .info {
-                    padding: 15px;
-                }
-                .card h3 {
-                    font-size: 1.1em;
-                    margin: 0 0 10px;
-                }
-                .card p {
-                    margin: 0;
-                    color: #007600;
-                    font-weight: bold;
-                }
-                .card a {
-                    display: block;
-                    margin-top: 10px;
-                    text-align: center;
-                    background: #3483fa;
-                    color: white;
-                    padding: 10px;
-                    border-radius: 5px;
-                    text-decoration: none;
-                }
-                .card a:hover {
-                    background: #2968c8;
-                }
-                .card h4{
-                    text-align: center;
-                    margin: 0;
-                    color: #9400D3;
-                    font-weight: bold;
-                }
-            </style>
-        </head>
-        <body>
-            <h1>Ofertas de '''+self.busqueda+''' en MercadoLibre</h1>
-            <div class="grid">
-        '''
-        cont_tmp = 1
-        items_pag+=1 #items_pag es un limite superior exclusivo, se le añade 1 para que funcione adecuadamente
-        for i in range(cont_items,len(ofertas)):
-            if cont_tmp%items_pag == 0:
-                cont_tmp = 1
-                break
-            html += f'''
-                <div class="card">
-                    <h4>{ofertas[i]["Tag"]}</h4>
-                    <img src="{ofertas[i]["Imagen"]}" alt="Imagen del producto">
-                    <div class="info">
-                        <h3>{ofertas[i]["Titulo"]}</h3>
-                        <p>{ofertas[i]["Precio"]}</p>
-                        <a href="{ofertas[i]["Enlace"]}" target="_blank">Ver en MercadoLibre</a>
+    def crear_html_ML(self,ofertas,cont_html,items_pag,cont_items,total_paginas) -> int: 
+                html = f'''
+                <!DOCTYPE html>
+                <html lang="es">
+                <head>
+                    <meta charset="UTF-8">
+                    <title>Ofertas de {self.busqueda} en MercadoLibre</title>
+                    <style>
+                        body {{
+                            font-family: Arial, sans-serif;
+                            background: #f2f2f2;
+                            padding: 20px;
+                        }}
+                        .header {{
+                            display: flex;
+                            align-items: center;
+                            justify-content: space-between;
+                            margin-bottom: 10px;
+                        }}
+                        .pagination {{
+                            display: flex;
+                            gap: 5px;
+                            border-color: red;
+                        }}
+                        .pagination a {{
+                            padding: 5px 10px;
+                            background: #ccc;
+                            color: black;
+                            text-decoration: none;
+                            border-radius: 4px;
+                            font-weight: bold;
+                        }}
+                        .pagination a.active {{
+                            background: #3483fa;
+                            color: white;
+                        }}
+                        h1 {{
+                            margin: 0;
+                            color: #333;
+                        }}
+                        .grid {{
+                            display: grid;
+                            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+                            gap: 20px;
+                            margin-top: 30px;
+                        }}
+                        .card {{
+                            background: white;
+                            border-radius: 10px;
+                            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                            overflow: hidden;
+                            transition: transform 0.2s ease;
+                        }}
+                        .card:hover {{
+                            transform: scale(1.03);
+                        }}
+                        .card img {{
+                            width: 100%;
+                            height: 200px;
+                            object-fit: contain;
+                            background: #fafafa;
+                        }}
+                        .card .info {{
+                            padding: 15px;
+                        }}
+                        .card h3 {{
+                            font-size: 1.1em;
+                            margin: 0 0 10px;
+                        }}
+                        .card p {{
+                            margin: 0;
+                            color: #007600;
+                            font-weight: bold;
+                        }}
+                        .card a {{
+                            display: block;
+                            margin-top: 10px;
+                            text-align: center;
+                            background: #3483fa;
+                            color: white;
+                            padding: 10px;
+                            border-radius: 5px;
+                            text-decoration: none;
+                        }}
+                        .card a:hover {{
+                            background: #2968c8;
+                        }}
+                        .card h4 {{
+                            text-align: center;
+                            margin: 0;
+                            color: #9400D3;
+                            font-weight: bold;
+                        }}
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <div class="pagination">
+                '''
+
+                # Botones de paginación
+                nombre_archivo = self.busqueda.replace(" ", "_")
+                for i in range(total_paginas):
+                    clase = "active" if i == cont_html else ""
+                    html += f'<a href="ofertas_{nombre_archivo}_{i}.html" class="{clase}">{i+1}</a>'
+
+                html += f'''
+                        </div>
+                        <h1>Ofertas de {self.busqueda} en MercadoLibre</h1>
                     </div>
-                </div>
-            '''
-            print(f"Cont tmp: {cont_tmp}")
-            cont_items+=1
-            cont_tmp+=1
+                    <div class="grid">
+                '''
 
-        html += '''
-            </div>
-        </body>
-        </html>
-        '''
-        nombre_archivo = self.busqueda.replace(" ","_")
-        os.makedirs(f"PaginasHTML/{nombre_archivo}",exist_ok=True)
-        with open(f"PaginasHTML/{nombre_archivo}/ofertas_{nombre_archivo}_{cont_html}.html", "w", encoding="utf-8") as file:
-            file.write(html)
+                # Renderizar productos
+                cont_tmp = 1
+                items_pag += 1
+                for i in range(cont_items, len(ofertas)):
+                    if cont_tmp % items_pag == 0:
+                        break
+                    html += f'''
+                        <div class="card">
+                            <h4>{ofertas[i]["Tag"]}</h4>
+                            <img src="{ofertas[i]["Imagen"]}" alt="Imagen del producto">
+                            <div class="info">
+                                <h3>{ofertas[i]["Titulo"]}</h3>
+                                <p>{ofertas[i]["Precio"]}</p>
+                                <a href="{ofertas[i]["Enlace"]}" target="_blank">Ver en MercadoLibre</a>
+                            </div>
+                        </div>
+                    '''
+                    cont_items += 1
+                    cont_tmp += 1
 
-        return cont_items
+                html += '''
+                    </div>
+                </body>
+                </html>
+                '''
+
+                # Guardar archivo
+                os.makedirs(f"PaginasHTML/{nombre_archivo}", exist_ok=True)
+                with open(f"PaginasHTML/{nombre_archivo}/ofertas_{nombre_archivo}_{cont_html}.html", "w", encoding="utf-8") as file:
+                    file.write(html)
+
+                return cont_items
+
 
 
     def mostrar_resultados_mercadoLibre_html(self,orden=1):
@@ -175,7 +214,7 @@ class ScraperOfertas:
         cont_items = 0
         cont_html = 0
         while cont_items<len(self.ofertas)-1:
-            cont_items=self.crear_html_ML(self.ofertas,cont_html,items_por_pagina,cont_items)
+            cont_items=self.crear_html_ML(self.ofertas,cont_html,items_por_pagina,cont_items,total_paginas=ceil(tamanio/items_por_pagina))
             cont_html+=1
         # Crear HTML
        
