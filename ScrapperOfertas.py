@@ -1,17 +1,19 @@
 
 import requests
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
 from bs4 import BeautifulSoup
-import pandas as pd
-import time
-import os
+from time import sleep
+from os import makedirs
 from math import ceil
+
 class ScraperOfertas:
     def __init__(self,busqueda_="",n_paginas_ = 1):
         self.busqueda  = busqueda_
         self.n_paginas = n_paginas_
         self.ofertas = []
-        self.headers   = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+        self.headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         }
         
     
@@ -26,7 +28,6 @@ class ScraperOfertas:
             response = requests.get(url, headers=self.headers)
             soup = BeautifulSoup(response.text, "html.parser")
             items = soup.find_all("li", class_="ui-search-layout__item")
-
             for item in items:
                 title_tag = item.find("h3", class_="poly-component__title-wrapper")
                 price_tag = item.find("span", class_="andes-money-amount")
@@ -34,34 +35,38 @@ class ScraperOfertas:
                 image_tag = item.find("img", class_="poly-component__picture")
                 highlight_tag =item.find("span",class_="poly-component__highlight")
                 condition_tag =item.find("span",class_="poly-component__item-condition")
-                if title_tag and price_tag and link_tag and image_tag and not condition_tag:
-                    if highlight_tag:
-                        highlight = highlight_tag.get_text(strip=True)
-                    else:
-                        highlight = "" 
+                discount_tag = item.find("span",class_="andes-money-amount__discount")
+                if title_tag and price_tag and link_tag and image_tag  and not condition_tag:
+                    highlight = highlight_tag.get_text(strip=True) if highlight_tag else ""
+                    discount = discount_tag.get_text(strip=True).replace("%","").replace("OFF","") if discount_tag else None
+                    discount_int = int(discount) if discount else None
                     title = title_tag.get_text(strip=True)
                     price = price_tag.get_text(strip=True)
-                    price_int = int(price.replace("$","").replace(",","").strip())
+                    price_float = float(price.replace("$","").replace(",","").strip())
                     link = link_tag["href"]
                     image_url = image_tag.get("data-src") or image_tag.get("data-lazy") or image_tag.get("src") #Mercado Libre usa lazy loading
                     self.ofertas.append({
                         "Tag":        highlight,
+                        "Descuento":  discount,
+                        "Descuento_int": discount_int,
                         "Titulo":     title,
                         "Precio":     price,
-                        "Precio_int": price_int,
+                        "Precio_float": price_float,
                         "Enlace":     link,
-                        "Imagen":     image_url
+                        "Imagen":     image_url,
+                        "Commerce":   "MercadoLibre"
                     })
 
         if self.n_paginas > 1:
-            time.sleep(3)# Espera entre páginas para no saturar el sitio
-    def crear_html_ML(self,ofertas,cont_html,items_pag,cont_items,total_paginas) -> int: 
+            sleep(3)# Espera entre páginas para no saturar el sitio
+
+    def crear_html(self,ofertas,cont_html,items_pag,cont_items,total_paginas,commerce) -> int: 
                 html = f'''
                 <!DOCTYPE html>
                 <html lang="es">
                 <head>
                     <meta charset="UTF-8">
-                    <title>Ofertas de {self.busqueda} en MercadoLibre</title>
+                    <title>Ofertas de {self.busqueda} en {commerce}</title>
                     <style>
                         body {{
                             font-family: Arial, sans-serif;
@@ -148,6 +153,12 @@ class ScraperOfertas:
                             color: #9400D3;
                             font-weight: bold;
                         }}
+                        h5.discount {{
+                            text-align: center;
+                            margin: 0;
+                            color: green;
+                            font-weight: bold;
+                        }}
                     </style>
                 </head>
                 <body>
@@ -163,7 +174,7 @@ class ScraperOfertas:
 
                 html += f'''
                         </div>
-                        <h1>Ofertas de {self.busqueda} en MercadoLibre</h1>
+                        <h1>Ofertas de {self.busqueda} en {commerce}</h1>
                     </div>
                     <div class="grid">
                 '''
@@ -174,14 +185,16 @@ class ScraperOfertas:
                 for i in range(cont_items, len(ofertas)):
                     if cont_tmp % items_pag == 0:
                         break
+                    tag_descuento = f'''<h5 class="discount">{ofertas[i]["Descuento"]}% Descuento</h5>''' if ofertas[i]["Descuento"]!=None else ""
                     html += f'''
                         <div class="card">
                             <h4>{ofertas[i]["Tag"]}</h4>
+                            {tag_descuento}
                             <img src="{ofertas[i]["Imagen"]}" alt="Imagen del producto">
                             <div class="info">
                                 <h3>{ofertas[i]["Titulo"]}</h3>
                                 <p>{ofertas[i]["Precio"]}</p>
-                                <a href="{ofertas[i]["Enlace"]}" target="_blank">Ver en MercadoLibre</a>
+                                <a href="{ofertas[i]["Enlace"]}" target="_blank">Ver en {ofertas[i]["Commerce"]}</a>
                             </div>
                         </div>
                     '''
@@ -195,32 +208,178 @@ class ScraperOfertas:
                 '''
 
                 # Guardar archivo
-                os.makedirs(f"PaginasHTML/{nombre_archivo}", exist_ok=True)
-                with open(f"PaginasHTML/{nombre_archivo}/ofertas_{nombre_archivo}_{cont_html}.html", "w", encoding="utf-8") as file:
+                makedirs(f"PaginasHTML/{nombre_archivo}_{commerce}", exist_ok=True)
+                with open(f"PaginasHTML/{nombre_archivo}_{commerce}/ofertas_{nombre_archivo}_{cont_html}.html", "w", encoding="utf-8") as file:
                     file.write(html)
 
                 return cont_items
 
+    def mostrar_resultados_mercadoLibre_html(self,orden=1,solo_descuento=False):
+        if solo_descuento:
+            self.ofertas = sorted(self.ofertas,
+                    key = lambda x:( 
+                        x["Tag"]=="",
+                        x["Descuento_int"]*-1,
+                        x["Precio_float"]*orden
+                        )
+                    )
+        else:
+            self.ofertas = sorted(self.ofertas,
+                    key = lambda x:( 
+                        x["Tag"]=="",
+                        x["Precio_float"]*orden
+                        )
+                    )
+        tamanio = len(self.ofertas)
+        print(f"TAMAÑO OFERTAS: {self.ofertas}")
+        items_por_pagina=24
+        cont_items = 0
+        cont_html = 0
+        if len(self.ofertas)==1:
+            cont_items=self.crear_html(self.ofertas,cont_html,items_por_pagina,cont_items,ceil(tamanio/items_por_pagina),"MercadoLibre")
+        while cont_items<len(self.ofertas)-1:
+            cont_items=self.crear_html(self.ofertas,cont_html,items_por_pagina,cont_items,ceil(tamanio/items_por_pagina),"MercadoLibre")
+            cont_html+=1
+        # Crear HTML
+       
+    def buscar_zegucom(self):
+        producto = self.busqueda
+        producto = producto.replace(" ", "+").strip()
+        url = f"https://www.zegucom.com.mx/#271f/embedded/m=f&p={self.n_paginas}&q={producto}"
+        print(f"Scrapeando {self.n_paginas} páginas de ZC con Selenium")
 
+        # Opciones para que Selenium no abra una ventana
+        options = Options()
+        options.add_argument("--headless")  
+        options.add_argument("--disable-gpu")
+        options.add_argument("--no-sandbox")
+        options.add_argument("--window-size=1920,1080")
 
-    def mostrar_resultados_mercadoLibre_html(self,orden=1):
-        self.ofertas = sorted(self.ofertas,
+        # Abre el navegador
+        driver = webdriver.Chrome(options=options)
+        driver.get(url)
+
+        # Esperamos a que cargue 
+        sleep(5)
+
+        # Extrae el HTML ya renderizado
+        soup = BeautifulSoup(driver.page_source, "html.parser")
+
+        # Cerramos el navegador
+        driver.quit()
+        items = soup.find_all("div", class_="dfd-card dfd-card-preset-product dfd-card-type-productos")
+        for item in items:
+            title_tag = item.find("div", class_="dfd-card-title")
+            search_price_discount= item.find("span", class_="dfd-card-price--sale")
+            if  search_price_discount!= None:
+                price_tag =search_price_discount
+            else:
+                price_tag = item.find("span", class_="dfprice4")
+            link_tag = item.find("a", class_="dfd-card-link")
+            image_tag = item.find("div", class_="dfd-card-thumbnail").find("img")
+            highlight_tag =item.find("div",class_="search-on-sale")
+            condition_tag =item.find("div",class_="dfd-availability")
+            discount_tag = item.find("div",class_="dfd-card-flag")
+            if title_tag and price_tag and link_tag and image_tag  and not condition_tag:
+                highlight = highlight_tag.get_text(strip=True).upper() if highlight_tag else ""
+                discount = discount_tag.get_text(strip=True).replace("%","") if discount_tag else None
+                discount_int = int(discount) if discount else None
+                title = title_tag.get_text(strip=True)
+                price = price_tag.get_text(strip=True)
+                price_float = float(price.replace("$","").replace(",","").strip())
+                link = link_tag["href"]
+                image_url = image_tag.get("data-src") or image_tag.get("data-lazy") or image_tag.get("src") #Mercado Libre usa lazy loading
+                self.ofertas.append({
+                    "Tag":        highlight,
+                    "Descuento":  discount,
+                    "Descuento_int": discount_int,
+                    "Titulo":     title,
+                    "Precio":     price,
+                    "Precio_float": price_float,
+                    "Enlace":     link,
+                    "Imagen":     image_url,
+                    "Commerce":   "Zegucom "
+                })
+
+    def mostrar_resultados_zegucom_html(self,orden=1,solo_descuento=False):
+        if solo_descuento:
+            self.ofertas = sorted(self.ofertas,
+                    key = lambda x:( 
+                        x["Tag"]=="",
+                        x["Descuento_int"]*-1,
+                        x["Precio_float"]*orden
+                        )
+                    )
+        else:
+            self.ofertas = sorted(self.ofertas,
                  key = lambda x:( 
                      x["Tag"]=="",
-                     x["Precio_int"]*orden)
+                     x["Precio_float"]*orden
+                     )
                 )
         tamanio = len(self.ofertas)
         items_por_pagina=24
         cont_items = 0
         cont_html = 0
-        while cont_items<len(self.ofertas)-1:
-            cont_items=self.crear_html_ML(self.ofertas,cont_html,items_por_pagina,cont_items,total_paginas=ceil(tamanio/items_por_pagina))
-            cont_html+=1
+        if len(self.ofertas)==1:
+            cont_items=self.crear_html(self.ofertas,cont_html,items_por_pagina,cont_items,ceil(tamanio/items_por_pagina),"Zegucom")
+        else:
+            while cont_items<len(self.ofertas)-1:
+                cont_items=self.crear_html(self.ofertas,cont_html,items_por_pagina,cont_items,ceil(tamanio/items_por_pagina),"Zegucom")
+                cont_html+=1
         # Crear HTML
-       
+
+    def buscar_global(self):
+        productos_en_mercadoLibre = 0
+        productos_en_Zegucom = 0
+        print("Buscando de manera global ...\nPORFAVOR ESPERE")
+        self.buscar_mercadoLibre()
+        productos_en_mercadoLibre = len(self.ofertas)
+        self.buscar_zegucom()
+        productos_en_Zegucom = len(self.ofertas)
+        print("!Busqueda Finalizada!")
+        print(f'Se encontraron:\n {productos_en_mercadoLibre}'
+               f' productos en MercadoLibre\n {productos_en_Zegucom} productos en Zegucom')
+        
+
+    def mostrar_resultados_global_html(self,orden=1,solo_descuento=False):
+        if solo_descuento:
+            self.ofertas = sorted(self.ofertas,
+                    key = lambda x:( 
+                        x["Tag"]=="",
+                        x["Descuento_int"]*-1,
+                        x["Precio_float"]*orden
+                        )
+                    )
+        else:
+            self.ofertas = sorted(self.ofertas,
+                 key = lambda x:( 
+                     x["Tag"]=="",
+                     x["Precio_float"]*orden
+                     )
+                )
+        tamanio = len(self.ofertas)
+        items_por_pagina=24
+        cont_items = 0
+        cont_html = 0
+        if len(self.ofertas)==1:
+            cont_items=self.crear_html(self.ofertas,cont_html,items_por_pagina,cont_items,ceil(tamanio/items_por_pagina),"Global")
+        else:
+            while cont_items<len(self.ofertas)-1:
+                cont_items=self.crear_html(self.ofertas,cont_html,items_por_pagina,cont_items,ceil(tamanio/items_por_pagina),"Global")
+                cont_html+=1
+        # Crear HTML
 
 def main():
-    scraper = ScraperOfertas("Samsung S24",2)
+    scraper = ScraperOfertas("laptop",2)
+    '''
     scraper.buscar_mercadoLibre()
-    scraper.mostrar_resultados_mercadoLibre_html()
+    scraper.mostrar_resultados_mercadoLibre_html(1)
+    '''
+    '''
+    scraper.buscar_zegucom()
+    scraper.mostrar_resultados_zegucom_html(1)
+    '''
+    scraper.buscar_global()
+    scraper.mostrar_resultados_global_html(1)
 main()
