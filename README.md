@@ -1,2 +1,2 @@
 Scrapper de ofertas 
-Puede buscar en ML
+Puede busca en MercadoLibre, Amazon y Zegucom.
