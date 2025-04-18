@@ -13,11 +13,12 @@ class ScraperOfertas:
         self.n_paginas = n_paginas_
         self.ofertas = []
         self.headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+        "Accept-language": "es-ES,es;q=0.9 "
         }
         
     
-    def buscar_mercadoLibre(self):
+    def buscar_mercadoLibre(self,solo_descuento=False):
         producto = self.busqueda
         producto = producto.replace(" ","-").strip()
         for i in range(self.n_paginas):
@@ -36,7 +37,7 @@ class ScraperOfertas:
                 highlight_tag =item.find("span",class_="poly-component__highlight")
                 condition_tag =item.find("span",class_="poly-component__item-condition")
                 discount_tag = item.find("span",class_="andes-money-amount__discount")
-                if title_tag and price_tag and link_tag and image_tag  and not condition_tag:
+                if title_tag and price_tag and link_tag and image_tag and not condition_tag and (discount_tag or not solo_descuento):
                     highlight = highlight_tag.get_text(strip=True) if highlight_tag else ""
                     discount = discount_tag.get_text(strip=True).replace("%","").replace("OFF","") if discount_tag else None
                     discount_int = int(discount) if discount else None
@@ -214,22 +215,15 @@ class ScraperOfertas:
 
                 return cont_items
 
-    def mostrar_resultados_mercadoLibre_html(self,orden=1,solo_descuento=False):
-        if solo_descuento:
-            self.ofertas = sorted(self.ofertas,
-                    key = lambda x:( 
-                        x["Tag"]=="",
-                        x["Descuento_int"]*-1,
-                        x["Precio_float"]*orden
-                        )
+    def mostrar_resultados_mercadoLibre_html(self,orden=1):
+        self.ofertas = sorted(self.ofertas,
+                key = lambda x:( 
+                    x["Tag"]=="",
+                    (x.get("Descuento_int") or 0)*-1,
+                    x["Precio_float"]*orden
                     )
-        else:
-            self.ofertas = sorted(self.ofertas,
-                    key = lambda x:( 
-                        x["Tag"]=="",
-                        x["Precio_float"]*orden
-                        )
-                    )
+                )
+        tamanio = len
         tamanio = len(self.ofertas)
         print(f"TAMAÑO OFERTAS: {self.ofertas}")
         items_por_pagina=24
@@ -242,7 +236,7 @@ class ScraperOfertas:
             cont_html+=1
         # Crear HTML
        
-    def buscar_zegucom(self):
+    def buscar_zegucom(self,solo_descuento=False):
         producto = self.busqueda
         producto = producto.replace(" ", "+").strip()
         url = f"https://www.zegucom.com.mx/#271f/embedded/m=f&p={self.n_paginas}&q={producto}"
@@ -280,7 +274,7 @@ class ScraperOfertas:
             highlight_tag =item.find("div",class_="search-on-sale")
             condition_tag =item.find("div",class_="dfd-availability")
             discount_tag = item.find("div",class_="dfd-card-flag")
-            if title_tag and price_tag and link_tag and image_tag  and not condition_tag:
+            if title_tag and price_tag and link_tag and image_tag and not condition_tag and (discount_tag or not solo_descuento):
                 highlight = highlight_tag.get_text(strip=True).upper() if highlight_tag else ""
                 discount = discount_tag.get_text(strip=True).replace("%","") if discount_tag else None
                 discount_int = int(discount) if discount else None
@@ -301,22 +295,15 @@ class ScraperOfertas:
                     "Commerce":   "Zegucom "
                 })
 
-    def mostrar_resultados_zegucom_html(self,orden=1,solo_descuento=False):
-        if solo_descuento:
-            self.ofertas = sorted(self.ofertas,
-                    key = lambda x:( 
-                        x["Tag"]=="",
-                        x["Descuento_int"]*-1,
-                        x["Precio_float"]*orden
-                        )
+    def mostrar_resultados_zegucom_html(self,orden=1):
+        self.ofertas = sorted(self.ofertas,
+                key = lambda x:( 
+                    x["Tag"]=="",
+                    (x.get("Descuento_int") or 0)*-1,
+                    x["Precio_float"]*orden
                     )
-        else:
-            self.ofertas = sorted(self.ofertas,
-                 key = lambda x:( 
-                     x["Tag"]=="",
-                     x["Precio_float"]*orden
-                     )
                 )
+        tamanio = len
         tamanio = len(self.ofertas)
         items_por_pagina=24
         cont_items = 0
@@ -329,35 +316,32 @@ class ScraperOfertas:
                 cont_html+=1
         # Crear HTML
 
-    def buscar_global(self):
+    def buscar_global(self,solo_descuento=False):
         productos_en_mercadoLibre = 0
         productos_en_Zegucom = 0
+        productos_en_Amazon = 0
         print("Buscando de manera global ...\nPORFAVOR ESPERE")
-        self.buscar_mercadoLibre()
+        self.buscar_mercadoLibre(solo_descuento)
         productos_en_mercadoLibre = len(self.ofertas)
-        self.buscar_zegucom()
-        productos_en_Zegucom = len(self.ofertas)
+        self.buscar_zegucom(solo_descuento)
+        productos_en_Zegucom = len(self.ofertas) - productos_en_mercadoLibre
+        self.buscar_amazon(solo_descuento)
+        productos_en_Amazon = len(self.ofertas) - productos_en_mercadoLibre - productos_en_Zegucom
         print("!Busqueda Finalizada!")
         print(f'Se encontraron:\n {productos_en_mercadoLibre}'
-               f' productos en MercadoLibre\n {productos_en_Zegucom} productos en Zegucom')
+               f' productos en MercadoLibre\n {productos_en_Zegucom} productos en Zegucom\n'
+               f' {productos_en_Amazon} productos en Amazon')
         
 
-    def mostrar_resultados_global_html(self,orden=1,solo_descuento=False):
-        if solo_descuento:
-            self.ofertas = sorted(self.ofertas,
-                    key = lambda x:( 
-                        x["Tag"]=="",
-                        x["Descuento_int"]*-1,
-                        x["Precio_float"]*orden
-                        )
+    def mostrar_resultados_global_html(self,orden=1):
+        self.ofertas = sorted(self.ofertas,
+                key = lambda x:( 
+                    x["Tag"]=="",
+                    (x.get("Descuento_int") or 0)*-1,
+                    x["Precio_float"]*orden
                     )
-        else:
-            self.ofertas = sorted(self.ofertas,
-                 key = lambda x:( 
-                     x["Tag"]=="",
-                     x["Precio_float"]*orden
-                     )
                 )
+        tamanio = len
         tamanio = len(self.ofertas)
         items_por_pagina=24
         cont_items = 0
@@ -370,8 +354,88 @@ class ScraperOfertas:
                 cont_html+=1
         # Crear HTML
 
+    def buscar_amazon(self,solo_descuento=False):
+        producto = self.busqueda
+        producto = producto.replace(" ","+").strip()
+        for i in range(self.n_paginas):
+            code = None
+            while code != 200:
+                url = f"https://www.amazon.com.mx/s?k={producto}&page={i+1}"
+                print(f"Scrapeando AZ página {i + 1}... ")
+
+                response = requests.get(url, headers=self.headers)
+                code = response.status_code
+                print(f"Error: {code} ...Volviendo a intentar") if code != 200 else ""
+                sleep(1) 
+            soup = BeautifulSoup(response.text, "html.parser")
+            items = soup.find_all("div", class_="template=SEARCH_RESULTS")
+            for item in items:
+                title_tag = item.find("h2").find("span")
+                price_tag = item.find("span", class_="a-offscreen")
+                link_tag = item.find("a", {"aria-describedby":"price-link"})
+                image_tag = item.find("img", class_="s-image")
+                highlight_tag =item.find("span",{"data-component-type":"s-status-badge-component"})
+                if highlight_tag:
+                    highlight_tag=highlight_tag.find("span",class_="a-badge-text")
+                else:
+                    highlight_tag = None
+                condition_tag = None #item.find("span",class_="poly-component__item-condition")
+                discount_tag = item.find("span",{"data-a-strike":"true"})
+                if discount_tag:
+                    discount_tag=discount_tag.find("span",class_="a-offscreen")
+                else:
+                    discount_tag = None
+                if title_tag and price_tag and link_tag and image_tag and not condition_tag and (discount_tag or not solo_descuento):
+                    highlight = highlight_tag.get_text(strip=True) if highlight_tag else ""
+                    if highlight == "Opción":highlight+=" Amazon"
+                    title = title_tag.get_text(strip=True)
+                    price = price_tag.get_text(strip=True)
+                    price_float = float(price.replace("$","").replace(",","").strip())
+                    if discount_tag:
+                        discount = (price_float - float(discount_tag.get_text(strip=True).replace("$","").replace(",","")))/price_float
+                        discount=int(discount*100)*-1
+                    else:
+                        discount = None
+                    discount_int = int(discount) if discount else None
+                    link = "https://www.amazon.com.mx/"+link_tag["href"]
+                    image_url = image_tag.get("data-src") or image_tag.get("data-lazy") or image_tag.get("src") #Mercado Libre usa lazy loading
+                    self.ofertas.append({
+                        "Tag":        highlight,
+                        "Descuento":  discount,
+                        "Descuento_int": discount_int,
+                        "Titulo":     title,
+                        "Precio":     price,
+                        "Precio_float": price_float,
+                        "Enlace":     link,
+                        "Imagen":     image_url,
+                        "Commerce":   "Amazon"
+                    })
+
+        if self.n_paginas > 1:
+            sleep(3)# Espera entre páginas para no saturar el sitio
+
+    def mostrar_resultados_Amazon_html(self,orden=1):
+        self.ofertas = sorted(self.ofertas,
+                key = lambda x:( 
+                    x["Tag"]=="",
+                    (x.get("Descuento_int") or 0)*-1,
+                    x["Precio_float"]*orden
+                    )
+                )
+        tamanio = len(self.ofertas)
+        items_por_pagina=24
+        cont_items = 0
+        cont_html = 0
+        if len(self.ofertas)==1:
+            cont_items=self.crear_html(self.ofertas,cont_html,items_por_pagina,cont_items,ceil(tamanio/items_por_pagina),"Amazon")
+        else:
+            while cont_items<len(self.ofertas)-1:
+                cont_items=self.crear_html(self.ofertas,cont_html,items_por_pagina,cont_items,ceil(tamanio/items_por_pagina),"Amazon")
+                cont_html+=1
+        # Crear HTML
+
 def main():
-    scraper = ScraperOfertas("laptop",2)
+    scraper = ScraperOfertas("laptop",1)
     '''
     scraper.buscar_mercadoLibre()
     scraper.mostrar_resultados_mercadoLibre_html(1)
@@ -380,6 +444,10 @@ def main():
     scraper.buscar_zegucom()
     scraper.mostrar_resultados_zegucom_html(1)
     '''
-    scraper.buscar_global()
+    scraper.buscar_global(solo_descuento=True)
     scraper.mostrar_resultados_global_html(1)
+    '''
+    scraper.buscar_amazon()
+    scraper.mostrar_resultados_Amazon_html(1)
+    '''
 main()
