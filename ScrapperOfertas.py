@@ -113,6 +113,9 @@ class ScraperOfertas:
                             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
                             overflow: hidden;
                             transition: transform 0.2s ease;
+                            display: flex;
+                            flex-direction: column;
+                            height: 100%; 
                         }}
                         .card:hover {{
                             transform: scale(1.03);
@@ -125,6 +128,9 @@ class ScraperOfertas:
                         }}
                         .card .info {{
                             padding: 15px;
+                            display: flex;
+                            flex-direction: column;
+                            flex-grow: 1; 
                         }}
                         .card h3 {{
                             font-size: 1.1em;
@@ -134,10 +140,11 @@ class ScraperOfertas:
                             margin: 0;
                             color: #007600;
                             font-weight: bold;
+                            margin-top: auto;
                         }}
                         .card a {{
                             display: block;
-                            margin-top: 10px;
+                            margin-top: auto;
                             text-align: center;
                             background: #3483fa;
                             color: white;
@@ -392,11 +399,12 @@ class ScraperOfertas:
                     price = price_tag.get_text(strip=True)
                     price_float = float(price.replace("$","").replace(",","").strip())
                     if discount_tag:
-                        discount = (price_float - float(discount_tag.get_text(strip=True).replace("$","").replace(",","")))/price_float
-                        discount=int(discount*100)*-1
+                        original_price = float(discount_tag.get_text(strip=True).replace("$","").replace(",",""))
+                        discount = ((price_float - original_price) /original_price)*-100
+                        discount = int(ceil(discount))
                     else:
                         discount = None
-                    discount_int = int(discount) if discount else None
+                    discount_int = discount if discount else None
                     link = "https://www.amazon.com.mx/"+link_tag["href"]
                     image_url = image_tag.get("data-src") or image_tag.get("data-lazy") or image_tag.get("src") #Mercado Libre usa lazy loading
                     self.ofertas.append({
@@ -434,8 +442,14 @@ class ScraperOfertas:
                 cont_html+=1
         # Crear HTML
 
+
+
+def menu():
+    busqueda = input("Ingresa el producto a buscar")
+
+
 def main():
-    scraper = ScraperOfertas("laptop",1)
+    scraper = ScraperOfertas("Laptop",1)
     '''
     scraper.buscar_mercadoLibre()
     scraper.mostrar_resultados_mercadoLibre_html(1)
@@ -444,10 +458,12 @@ def main():
     scraper.buscar_zegucom()
     scraper.mostrar_resultados_zegucom_html(1)
     '''
-    scraper.buscar_global(solo_descuento=True)
+    scraper.buscar_global()
     scraper.mostrar_resultados_global_html(1)
     '''
     scraper.buscar_amazon()
     scraper.mostrar_resultados_Amazon_html(1)
     '''
+    
+    menu()
 main()
